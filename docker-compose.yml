@@ -1,0 +1,31 @@
+# docker-compose.yml
+# Local testing before pushing to AWS Elastic Beanstalk
+#
+# Usage:
+#   docker compose up --build
+#   Open http://localhost:5000
+
+version: "3.9"
+
+services:
+  imhm:
+    build: .
+    image: imhm:latest
+    container_name: imhm_app
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    volumes:
+      # Mount real AWS IoT certificates at runtime (never bake into image)
+      - ./certs:/app/certs:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/machines"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

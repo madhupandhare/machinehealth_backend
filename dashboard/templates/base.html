@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>{% block title %}IMHM — Industrial Monitor{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:       #07090f;
+      --panel:    #0d1117;
+      --card:     #111827;
+      --border:   #1c2a3a;
+      --glow:     #00ffe7;
+      --glow2:    #0099ff;
+      --green:    #00ff88;
+      --yellow:   #ffe040;
+      --red:      #ff3b5c;
+      --red-glow: rgba(255,59,92,0.4);
+      --text:     #cdd9e5;
+      --muted:    #4a6070;
+      --mono:     'IBM Plex Mono', monospace;
+      --display:  'Orbitron', sans-serif;
+      --body:     'IBM Plex Sans', sans-serif;
+      --r:        5px;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;
+         background-image: radial-gradient(ellipse at 20% 10%, rgba(0,255,231,0.03) 0%, transparent 60%),
+                           radial-gradient(ellipse at 80% 80%, rgba(0,153,255,0.04) 0%, transparent 60%);}
+
+    /* ── Scanline overlay ──────────────────────────────────────────────────── */
+    body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+      background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);}
+
+    /* ── Nav ───────────────────────────────────────────────────────────────── */
+    nav{background:var(--panel);border-bottom:1px solid var(--border);
+        display:flex;align-items:center;padding:0 28px;height:58px;
+        position:sticky;top:0;z-index:100;
+        box-shadow:0 0 20px rgba(0,255,231,0.05);}
+    .nav-brand{font-family:var(--display);font-size:13px;color:var(--glow);
+               letter-spacing:0.18em;text-decoration:none;display:flex;align-items:center;gap:10px;}
+    .nav-brand svg{width:20px;height:20px;filter:drop-shadow(0 0 4px var(--glow));}
+    .nav-links{margin-left:auto;display:flex;gap:28px;}
+    .nav-links a{color:var(--muted);text-decoration:none;font-family:var(--mono);font-size:11px;
+                 letter-spacing:0.1em;text-transform:uppercase;transition:color .2s;}
+    .nav-links a:hover{color:var(--glow);}
+    .nav-status{margin-left:28px;display:flex;align-items:center;gap:6px;
+                font-family:var(--mono);font-size:10px;color:var(--green);}
+    .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);
+           box-shadow:0 0 8px var(--green);animation:blink 1.8s ease-in-out infinite;}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+    .wrap{max-width:1360px;margin:0 auto;padding:28px 24px;}
+    .page-head{display:flex;align-items:center;gap:14px;margin-bottom:26px;flex-wrap:wrap;}
+    .page-title{font-family:var(--display);font-size:16px;letter-spacing:.14em;
+                color:var(--text);text-transform:uppercase;}
+    .page-title::before{content:'//';color:var(--glow);margin-right:8px;font-size:14px;}
+
+    /* ── Cards ─────────────────────────────────────────────────────────────── */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;
+          transition:border-color .25s;}
+    .card:hover{border-color:rgba(0,255,231,0.2);}
+    .card-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;
+                text-transform:uppercase;color:var(--muted);margin-bottom:12px;
+                display:flex;align-items:center;gap:6px;}
+    .card-label::before{content:'';display:inline-block;width:3px;height:10px;
+                        background:var(--glow);border-radius:2px;}
+
+    /* ── Badges ────────────────────────────────────────────────────────────── */
+    .badge{display:inline-block;padding:3px 12px;border-radius:2px;
+           font-family:var(--mono);font-size:10px;letter-spacing:.12em;font-weight:600;text-transform:uppercase;}
+    .badge-healthy {background:rgba(0,255,136,.12);color:var(--green); border:1px solid rgba(0,255,136,.3);}
+    .badge-warning {background:rgba(255,224,64,.12);color:var(--yellow);border:1px solid rgba(255,224,64,.3);}
+    .badge-critical{background:rgba(255,59,92,.15); color:var(--red);   border:1px solid rgba(255,59,92,.4);
+                    box-shadow:0 0 12px rgba(255,59,92,.2);animation:critpulse 1.5s ease-in-out infinite;}
+    @keyframes critpulse{0%,100%{box-shadow:0 0 12px rgba(255,59,92,.2)}50%{box-shadow:0 0 20px rgba(255,59,92,.5)}}
+    .badge-unknown{background:rgba(74,96,112,.15);color:var(--muted);border:1px solid var(--border);}
+
+    /* ── Score ring ────────────────────────────────────────────────────────── */
+    .ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center;}
+    .ring-wrap canvas{transform:rotate(-90deg);}
+    .ring-num{position:absolute;font-family:var(--display);font-size:24px;
+              color:var(--text);text-align:center;line-height:1;}
+    .ring-num small{display:block;font-family:var(--mono);font-size:8px;
+                    color:var(--muted);letter-spacing:.1em;margin-top:3px;}
+
+    /* ── Stat ──────────────────────────────────────────────────────────────── */
+    .stat{display:flex;flex-direction:column;gap:3px;}
+    .stat-label{font-family:var(--mono);font-size:9px;color:var(--muted);
+                letter-spacing:.12em;text-transform:uppercase;}
+    .stat-val  {font-family:var(--display);font-size:20px;color:var(--text);}
+    .stat-unit {font-family:var(--mono);font-size:9px;color:var(--muted);}
+
+    /* ── Grid helpers ──────────────────────────────────────────────────────── */
+    .g2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+    @media(max-width:1000px){.g4{grid-template-columns:1fr 1fr;}}
+    @media(max-width:600px){.g4,.g2{grid-template-columns:1fr;}}
+
+    /* ── Oscilloscope panel ────────────────────────────────────────────────── */
+    .osc{background:#050810;border:1px solid #0f2035;border-radius:var(--r);
+         padding:16px 16px 12px;position:relative;overflow:hidden;}
+    .osc::before{content:'';position:absolute;inset:0;pointer-events:none;
+      background:repeating-linear-gradient(0deg,transparent 0px,transparent 19px,rgba(0,255,231,0.03) 19px,rgba(0,255,231,0.03) 20px),
+                 repeating-linear-gradient(90deg,transparent 0px,transparent 19px,rgba(0,255,231,0.03) 19px,rgba(0,255,231,0.03) 20px);}
+    .osc-label{font-family:var(--mono);font-size:9px;letter-spacing:.15em;
+               color:rgba(0,255,231,.5);text-transform:uppercase;margin-bottom:8px;}
+    .osc canvas{display:block;width:100%!important;}
+
+    /* ── Table ─────────────────────────────────────────────────────────────── */
+    .tbl{width:100%;border-collapse:collapse;}
+    .tbl th{font-family:var(--mono);font-size:9px;color:var(--muted);
+            letter-spacing:.12em;text-transform:uppercase;padding:8px 12px;
+            border-bottom:1px solid var(--border);text-align:left;}
+    .tbl td{padding:9px 12px;border-bottom:1px solid rgba(28,42,58,.5);
+            font-size:12px;color:var(--text);}
+    .tbl tr:hover td{background:rgba(0,255,231,.025);}
+    .tbl a{color:var(--glow);text-decoration:none;}
+    .tbl a:hover{text-decoration:underline;}
+
+    /* ── Anomaly chip ──────────────────────────────────────────────────────── */
+    .chip{padding:4px 12px;border-radius:2px;font-family:var(--mono);font-size:10px;
+          letter-spacing:.08em;border:1px solid;}
+    .chip-on {color:var(--red); background:rgba(255,59,92,.1);border-color:rgba(255,59,92,.35);}
+    .chip-off{color:var(--muted);background:rgba(15,32,53,.4);border-color:var(--border);}
+
+    footer{border-top:1px solid var(--border);padding:14px 24px;
+           font-family:var(--mono);font-size:10px;color:var(--muted);
+           letter-spacing:.1em;text-align:center;}
+  </style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    IMHM — MACHINE HEALTH MONITOR
+  </a>
+  <div class="nav-links">
+    <a href="/dashboard">Overview</a>
+    <a href="/api/machines">API</a>
+    <a href="/api/alerts">Alerts</a>
+  </div>
+  <div class="nav-status"><span class="pulse"></span>LIVE</div>
+</nav>
+
+<main>{% block content %}{% endblock %}</main>
+
+<footer>FOG-BASED INDUSTRIAL MACHINE HEALTH MONITORING SYSTEM &mdash; MSc Project &mdash; AWS IoT Core</footer>
+</body>
+</html>

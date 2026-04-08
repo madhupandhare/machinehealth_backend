@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.Python
+
+# Environment & secrets — NEVER commit these
+.env
+certs/*.crt
+certs/*.key
+certs/*.pem
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Lambda packaging
+cloud/lambda_processor/package/
+cloud/lambda_processor/lambda.zip
+
+# Elastic Beanstalk
+.elasticbeanstalk/
+
+# Logs
+*.log
+logs/

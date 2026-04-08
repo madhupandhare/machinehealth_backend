@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block title %}{{ machine_id }} — IMHM{% endblock %}
+
+{% block head_extra %}
+<style>
+  .metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;}
+  @media(max-width:900px){.metrics-grid{grid-template-columns:1fr 1fr;}}
+  .chips-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;}
+  .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px;}
+  @media(max-width:800px){.charts-grid{grid-template-columns:1fr;}}
+
+  /* Critical alert banner */
+  .crit-banner{
+    background:rgba(255,59,92,.08);
+    border:1px solid rgba(255,59,92,.5);
+    border-radius:var(--r);
+    padding:14px 20px;
+    margin-bottom:20px;
+    display:flex;align-items:center;gap:12px;
+    font-family:var(--mono);font-size:12px;color:var(--red);
+    animation:critpulse 2s ease-in-out infinite;
+  }
+  .crit-banner svg{flex-shrink:0;filter:drop-shadow(0 0 6px var(--red));}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="page-head">
+    <a href="/dashboard" style="font-family:var(--mono);font-size:10px;color:var(--muted);text-decoration:none;">← OVERVIEW</a>
+    <div class="page-title">{{ machine_id|upper }}</div>
+    {% if latest %}
+      {% set st = latest.machine_state %}
+      <span class="badge badge-{{ st }}">{{ st }}</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--muted);">
+        <span class="pulse"></span> {{ (latest.timestamp or '')[:19]|replace('T',' ') }}
+      </span>
+    {% endif %}
+  </div>
+
+  {% if latest %}
+
+  <!-- Critical banner (shown only when critical) -->
+  {% if latest.machine_state == 'critical' %}
+  <div class="crit-banner">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    CRITICAL STATE DETECTED — SNS alert has been dispatched to all subscribers.
+    Health Score: {{ latest.health_score }}/100 &nbsp;|&nbsp;
+    Active Anomalies: {{ latest.anomalies.values()|list|select|list|length }} flag(s)
+  </div>
+  {% endif %}
+
+  <!-- Top row: score + metrics -->
+  <div style="display:grid;grid-template-columns:140px 1fr;gap:18px;margin-bottom:20px;">
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+      <div class="card-label" style="justify-content:center;">Health</div>
+      <div class="ring-wrap">
+        <canvas id="big-ring" width="110" height="110"></canvas>
+        <div class="ring-num" style="font-size:28px;">
+          {{ latest.health_score }}
+          <small>/ 100</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Aggregated Metrics — {{ latest.window_seconds }}s window</div>
+      <div class="metrics-grid" style="margin:0;">
+        {% set m = latest.metrics %}
+        <div class="stat">
+          <div class="stat-label">Vibration RMS</div>
+          <div class="stat-val">{{ "%.2f"|format(m.vibration_rms) if m.vibration_rms is not none else '—' }}</div>
+          <div class="stat-unit">mm/s</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg Temperature</div>
+          <div class="stat-val">{{ "%.1f"|format(m.avg_temperature) if m.avg_temperature is not none else '—' }}</div>
+          <div class="stat-unit">°C</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg Current</div>
+          <div class="stat-val">{{ "%.2f"|format(m.avg_current) if m.avg_current is not none else '—' }}</div>
+          <div class="stat-unit">A</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Avg Acoustic</div>
+          <div class="stat-val">{{ "%.1f"|format(m.avg_acoustic) if m.avg_acoustic is not none else '—' }}</div>
+          <div class="stat-unit">dB</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anomaly chips -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-label">Anomaly Flags</div>
+    <div class="chips-row" style="margin:0;">
+      {% for k, v in latest.anomalies.items() %}
+      <span class="chip {{ 'chip-on' if v else 'chip-off' }}">
+        {% if v %}⚠ {% endif %}{{ k|replace('_',' ')|upper }}
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ====== SINUSOIDAL WAVEFORM OSCILLOSCOPES ====== -->
+  <div style="margin-bottom:12px;font-family:var(--mono);font-size:10px;color:var(--muted);letter-spacing:.1em;">
+    // LIVE SENSOR WAVEFORMS — RAW READINGS
+  </div>
+  <div class="charts-grid">
+
+    <div class="osc">
+      <div class="osc-label">CH1 — Vibration (mm/s)</div>
+      <canvas id="wave-vibration" height="120"></canvas>
+    </div>
+
+    <div class="osc">
+      <div class="osc-label">CH2 — Temperature (°C)</div>
+      <canvas id="wave-temperature" height="120"></canvas>
+    </div>
+
+    <div class="osc">
+      <div class="osc-label">CH3 — Current (A)</div>
+      <canvas id="wave-current" height="120"></canvas>
+    </div>
+
+    <div class="osc">
+      <div class="osc-label">CH4 — Acoustic (dB)</div>
+      <canvas id="wave-acoustic" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Health score trend -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-label">Health Score Timeline</div>
+    <div style="position:relative;height:120px;">
+      <canvas id="score-chart"></canvas>
+    </div>
+  </div>
+
+  {% else %}
+  <div class="card" style="text-align:center;padding:56px;">
+    <div style="font-family:var(--display);font-size:14px;color:var(--muted);letter-spacing:.1em;">
+      NO DATA FOR {{ machine_id|upper }}
+    </div>
+  </div>
+  {% endif %}
+
+</div><!-- /wrap -->
+
+<script>
+// ── Data from server ────────────────────────────────────────────────────────
+const history  = {{ history|tojson }};
+const latest   = {{ latest|tojson }};
+const machineId = "{{ machine_id }}";
+
+Chart.defaults.color          = '#4a6070';
+Chart.defaults.font.family    = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size      = 9;
+
+const stateColor = {healthy:'#00ff88',warning:'#ffe040',critical:'#ff3b5c',unknown:'#4a6070'};
+
+// ── Big health ring ─────────────────────────────────────────────────────────
+{%if latest %}
+const score = latest.health_score ?? 0;
+const state = latest.machine_state ?? 'unknown';
+const col   = stateColor[state] ?? '#4a6070';
+new Chart(document.getElementById('big-ring'),{
+  type:'doughnut',
+  data:{datasets:[{data:[score,100-score],
+    backgroundColor:[col,'rgba(255,255,255,0.04)'],borderWidth:0,borderRadius:3}]},
+  options:{cutout:'72%',animation:{duration:900},
+           plugins:{legend:{display:false},tooltip:{enabled:false}},events:[]}
+});
+{% endif %}
+
+// ── Health score trend ──────────────────────────────────────────────────────
+{%if history %}
+const scoreCtx = document.getElementById('score-chart');
+new Chart(scoreCtx,{
+  type:'line',
+  data:{
+    labels: history.map(d=>d.timestamp?.slice(11,19)||''),
+    datasets:[{
+      data: history.map(d=>d.health_score),
+      borderColor:'#00ffe7',
+      backgroundColor:'rgba(0,255,231,0.05)',
+      fill:true,tension:0.35,pointRadius:0,borderWidth:1.5
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    animation:{duration:300},
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{grid:{color:'rgba(28,42,58,.6)'},ticks:{maxTicksLimit:8}},
+      y:{min:0,max:100,grid:{color:'rgba(28,42,58,.6)'}}
+    }
+  }
+});
+{% endif %}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SINUSOIDAL WAVEFORM ENGINE
+// Fetches raw per-sensor readings from /api/machines/<id>/waveform/<sensor>
+// and renders them as oscilloscope-style line charts.
+// Falls back to generating a sinusoidal simulation from aggregated history
+// when live raw data isn't available yet.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const WAVE_CONFIG = {
+  vibration:   {color:'#00ffe7', warnLine:10, critLine:16, label:'mm/s'},
+  temperature: {color:'#ff9f40', warnLine:88, critLine:100,label:'°C'},
+  current:     {color:'#00ff88', warnLine:22, critLine:28, label:'A'},
+  acoustic:    {color:'#c87eff', warnLine:78, critLine:90, label:'dB'},
+};
+
+// Oscilloscope chart factory
+function makeOscChart(canvasId, color, warnLine, critLine) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  return new Chart(ctx, {
+    type:'line',
+    data:{
+      labels:[],
+      datasets:[
+        // main waveform
+        {data:[],borderColor:color,backgroundColor:'transparent',
+         fill:false,tension:0.3,pointRadius:0,borderWidth:1.5,label:'signal'},
+        // warning threshold
+        {data:[],borderColor:'rgba(255,224,64,0.4)',borderDash:[3,3],
+         borderWidth:1,pointRadius:0,fill:false,label:'warn'},
+        // critical threshold
+        {data:[],borderColor:'rgba(255,59,92,0.45)',borderDash:[3,3],
+         borderWidth:1,pointRadius:0,fill:false,label:'crit'},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:{duration:0},  // no animation for live waveform
+      plugins:{legend:{display:false},
+               tooltip:{mode:'index',intersect:false,
+                        callbacks:{label:ctx=>`${ctx.parsed.y?.toFixed(2)??''} ${WAVE_CONFIG[canvasId.replace('wave-','')]?.label||''}`}}},
+      scales:{
+        x:{display:false},
+        y:{grid:{color:'rgba(0,255,231,0.05)',lineWidth:1},
+           ticks:{color:'rgba(0,255,231,0.3)',maxTicksLimit:5},
+           border:{color:'rgba(0,255,231,0.1)'}}
+      }
+    }
+  });
+}
+
+const oscCharts = {};
+for (const sensor of Object.keys(WAVE_CONFIG)) {
+  const cfg = WAVE_CONFIG[sensor];
+  oscCharts[sensor] = makeOscChart(`wave-${sensor}`, cfg.color, cfg.warnLine, cfg.critLine);
+}
+
+// Feed chart with data array
+function feedChart(chart, points, warnLine, critLine) {
+  if (!chart || !points.length) return;
+  const labels = points.map(p => p.t ? p.t.slice(11,19) : '');
+  const values = points.map(p => p.v);
+  const n = values.length;
+  chart.data.labels              = labels;
+  chart.data.datasets[0].data   = values;
+  chart.data.datasets[1].data   = Array(n).fill(warnLine);
+  chart.data.datasets[2].data   = Array(n).fill(critLine);
+  chart.update('none');
+}
+
+// Sinusoidal fallback generator from aggregated history
+function buildSineFromHistory(sensor, historyArr) {
+  if (!historyArr.length) return [];
+  const key = sensor === 'vibration' ? 'vibration_rms'
+    : sensor === 'temperature' ? 'avg_temperature'
+    : sensor === 'current'     ? 'avg_current'
+    :                             'avg_acoustic';
+  const pts = [];
+  historyArr.forEach((d, i) => {
+    const base = d.metrics?.[key] ?? 0;
+    // Interpolate 10 sine sub-samples per aggregated window
+    for (let j = 0; j < 10; j++) {
+      const phase = (i * 10 + j) * 0.4;
+      const noise = (Math.random() - 0.5) * base * 0.08;
+      const amplitude = base * 0.15;
+      pts.push({
+        t: d.timestamp ?? '',
+        v: parseFloat((base + Math.sin(phase) * amplitude + noise).toFixed(3))
+      });
+    }
+  });
+  return pts;
+}
+
+// Poll for live waveform data from API, fallback to sine interpolation
+async function updateWaveforms() {
+  for (const sensor of Object.keys(WAVE_CONFIG)) {
+    const cfg   = WAVE_CONFIG[sensor];
+    const chart = oscCharts[sensor];
+    if (!chart) continue;
+    try {
+      const resp = await fetch(`/api/machines/${machineId}/waveform/${sensor}`);
+      const data = await resp.json();
+      if (data && data.length >= 10) {
+        feedChart(chart, data, cfg.warnLine, cfg.critLine);
+      } else {
+        // Not enough live data — render sinusoidal interpolation from history
+        const sineData = buildSineFromHistory(sensor, history);
+        feedChart(chart, sineData, cfg.warnLine, cfg.critLine);
+      }
+    } catch(e) {
+      const sineData = buildSineFromHistory(sensor, history);
+      feedChart(chart, sineData, cfg.warnLine, cfg.critLine);
+    }
+  }
+}
+
+// Initial render
+updateWaveforms();
+
+// Poll API every 3 seconds for live waveform refresh
+setInterval(updateWaveforms, 3000);
+
+// Full page refresh every 10 seconds to update aggregate metrics
+setTimeout(()=>location.reload(), 10000);
+</script>
+{% endblock %}

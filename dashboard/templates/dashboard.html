@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Machine Health Dashboard</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#f5f7fb;
+  margin:0;
+  color:#333;
+}
+
+/* Header */
+header{
+  background:#ffffff;
+  padding:15px 25px;
+  border-bottom:1px solid #ddd;
+  display:flex;
+  justify-content:space-between;
+}
+h1{
+  font-size:18px;
+  margin:0;
+}
+
+/* Layout */
+main{
+  padding:20px;
+  max-width:1100px;
+  margin:auto;
+}
+
+/* Cards */
+.card{
+  background:#fff;
+  border-radius:10px;
+  padding:15px;
+  margin-bottom:15px;
+  border:1px solid #e0e0e0;
+}
+
+/* Metrics */
+.metrics{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+
+.metric{
+  background:#fafafa;
+  padding:10px;
+  border-radius:8px;
+  text-align:center;
+}
+
+.metric h3{
+  margin:5px 0;
+  font-size:16px;
+}
+
+/* Waveforms */
+.wave-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:15px;
+}
+
+.wave{
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:8px;
+  padding:10px;
+}
+
+.wave canvas{
+  width:100% !important;
+  height:80px !important; /* 🔥 reduced size */
+}
+
+/* Table */
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+th,td{
+  padding:8px;
+  border-bottom:1px solid #ddd;
+  text-align:left;
+  font-size:13px;
+}
+
+th{
+  background:#f0f0f0;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>Machine Health Dashboard</h1>
+  <div id="time"></div>
+</header>
+
+<main>
+
+<div class="card">
+  <h2>Machine Status</h2>
+  <p><b>State:</b> <span id="state">--</span></p>
+  <p><b>Health Score:</b> <span id="score">--</span></p>
+</div>
+
+<div class="card metrics" id="metrics"></div>
+
+<div class="card">
+  <h2>Live Waveforms</h2>
+  <div class="wave-grid">
+
+    <div class="wave">
+      <p>Vibration</p>
+      <canvas id="vibration"></canvas>
+    </div>
+
+    <div class="wave">
+      <p>Temperature</p>
+      <canvas id="temperature"></canvas>
+    </div>
+
+    <div class="wave">
+      <p>Current</p>
+      <canvas id="current"></canvas>
+    </div>
+
+    <div class="wave">
+      <p>Acoustic</p>
+      <canvas id="acoustic"></canvas>
+    </div>
+
+  </div>
+</div>
+
+<div class="card">
+  <h2>Recent Data</h2>
+  <table id="table"></table>
+</div>
+
+</main>
+
+<script>
+
+/* Clock */
+setInterval(()=>{
+  document.getElementById("time").innerText =
+    new Date().toLocaleTimeString();
+},1000);
+
+/* Simple charts */
+function createChart(id,color){
+  return new Chart(document.getElementById(id),{
+    type:'line',
+    data:{
+      labels:new Array(20).fill(''),
+      datasets:[{
+        data:new Array(20).fill(0),
+        borderColor:color,
+        tension:0.4,
+        pointRadius:0
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{display:false},
+        y:{display:false}
+      }
+    }
+  });
+}
+
+const charts = {
+  vibration:createChart('vibration','#007bff'),
+  temperature:createChart('temperature','#ff9800'),
+  current:createChart('current','#28a745'),
+  acoustic:createChart('acoustic','#9c27b0')
+};
+
+/* Fake data update (replace with API) */
+setInterval(()=>{
+
+  const data = {
+    vibration: Math.random()*20,
+    temperature: 60 + Math.random()*20,
+    current: 10 + Math.random()*10,
+    acoustic: 50 + Math.random()*20,
+    score: Math.floor(Math.random()*100),
+    state: ["healthy","warning","critical"][Math.floor(Math.random()*3)]
+  };
+
+  document.getElementById("score").innerText = data.score;
+  document.getElementById("state").innerText = data.state;
+
+  /* Metrics */
+  document.getElementById("metrics").innerHTML = `
+    <div class="metric">Vibration<br><h3>${data.vibration.toFixed(1)}</h3></div>
+    <div class="metric">Temp<br><h3>${data.temperature.toFixed(1)}</h3></div>
+    <div class="metric">Current<br><h3>${data.current.toFixed(1)}</h3></div>
+    <div class="metric">Acoustic<br><h3>${data.acoustic.toFixed(1)}</h3></div>
+  `;
+
+  /* Update charts */
+  for(let key in charts){
+    const ch = charts[key];
+    ch.data.datasets[0].data.push(data[key]);
+    ch.data.datasets[0].data.shift();
+    ch.update();
+  }
+
+},1000);
+
+</script>
+
+</body>
+</html>
