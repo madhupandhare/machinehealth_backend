@@ -1,5 +1,6 @@
 """
 cloud/api/app.py — Flask application factory
+Loads .env, registers API + demo blueprints, serves React build.
 """
 import logging
 import os
@@ -13,24 +14,21 @@ except ImportError:
     pass
 
 from flask import Flask, jsonify, send_from_directory
-from cloud.api.routes import api_bp
-from cloud.api.demo_routes import demo_bp   # demo injection endpoints
+from cloud.api.routes      import api_bp
+from cloud.api.demo_routes import demo_bp
 
 REACT_BUILD = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "../../dashboard/react_build"
 )
 
-
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
     app.config["JSON_SORT_KEYS"] = False
 
-    # Register blueprints
     app.register_blueprint(api_bp)
     app.register_blueprint(demo_bp)
 
-    # Serve React build when available
     if os.path.isdir(REACT_BUILD):
         @app.route("/", defaults={"path": ""})
         @app.route("/<path:path>")
@@ -46,13 +44,10 @@ def create_app() -> Flask:
         def index():
             return jsonify({
                 "status": "IMHM Flask API running",
-                "react":  "Not built yet. Run: cd imhm-frontend && npm run build",
-                "api":    "/api/machines",
-                "demo":   "/api/demo/scenarios",
+                "endpoints": ["/api/machines", "/api/demo/inject", "/api/demo/status"],
             })
 
     return app
-
 
 if __name__ == "__main__":
     logging.basicConfig(

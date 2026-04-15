@@ -1,0 +1,19 @@
+service: imhm-flask-api
+
+provider:
+  name: aws
+  runtime: python3.10
+  region: eu-west-1
+
+functions:
+  app:
+    handler: wsgi_handler.handler
+    events:
+      - httpApi: '*'
+
+plugins:
+  - serverless-wsgi
+
+custom:
+  wsgi:
+    app: cloud.api.app.app
