@@ -3,7 +3,7 @@ service: imhm-flask-api
 provider:
   name: aws
   runtime: python3.10
-  region: eu-west-1
+  region: us-east-1
 
 functions:
   app:

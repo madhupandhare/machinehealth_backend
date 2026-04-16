@@ -54,5 +54,5 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
     )
-    port = int(os.environ.get("FLASK_PORT", 5000))
-    create_app().run(host="0.0.0.0", port=port, debug=False, threaded=True)
+
+    create_app().run(host="0.0.0.0", threaded=True)

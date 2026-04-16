@@ -10,13 +10,13 @@ machine:
 
 # ── AWS IoT Core (replaces Mosquitto entirely) ────────────────────────────────
 iot:
-  endpoint: "a2s5usvnbernh1-ats.iot.us-east-1.amazonaws.com" # e.g. abc123-ats.iot.eu-west-1.amazonaws.com
+  endpoint: "a2s5usvnbernh1-ats.iot.us-east-1.amazonaws.com"
   port: 8883
   client_id_prefix: "imhm"
   cert_path: "certs/device.pem.crt"
   private_key_path: "certs/private.pem.key"
   root_ca_path: "certs/AmazonRootCA1.pem"
-  keepalive: 60
+  keepalive: 30
 
 # ── Sensor MQTT topics (published directly to IoT Core) ──────────────────────
 sensors:
